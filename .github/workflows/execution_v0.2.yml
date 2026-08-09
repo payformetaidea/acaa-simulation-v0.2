@@ -1,0 +1,84 @@
+name: ACAA Execution v0.2 — Independent Verification
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  verify-execution:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+
+      - name: Verify File Integrity
+        run: |
+          echo "=== FILE INTEGRITY VERIFICATION ==="
+          sha256sum value_flow_simulator_v0.2.py
+          sha256sum config_v2.0.json
+
+      - name: Record Environment Manifest
+        run: |
+          echo "## Execution Environment" > environment_manifest_v0.2.md
+          echo "- OS: $(uname -sr)" >> environment_manifest_v0.2.md
+          echo "- Python: $(python3 --version)" >> environment_manifest_v0.2.md
+          echo "- Start: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> environment_manifest_v0.2.md
+
+      - name: Run Baseline
+        run: |
+          echo "=== BASELINE ==="
+          python3 value_flow_simulator_v0.2.py --scenario baseline --output baseline_v0.2.json
+
+      - name: Run Attack Scenarios (6)
+        run: |
+          echo "=== ATTACK SCENARIOS ==="
+          python3 value_flow_simulator_v0.2.py --scenario sybil --output sybil_v0.2.json
+          python3 value_flow_simulator_v0.2.py --scenario collusion --output collusion_v0.2.json
+          python3 value_flow_simulator_v0.2.py --scenario spam --output spam_v0.2.json
+          python3 value_flow_simulator_v0.2.py --scenario gate_inflation --output gate_inflation_v0.2.json
+          python3 value_flow_simulator_v0.2.py --scenario strategic_abstention --output abstention_v0.2.json
+          python3 value_flow_simulator_v0.2.py --scenario negative_exploitation --output exploitation_v0.2.json
+
+      - name: Run Sensitivity Analysis (5 params)
+        run: |
+          echo "=== SENSITIVITY ANALYSIS ==="
+          python3 value_flow_simulator_v0.2.py --sensitivity lam --output sens_lam_v0.2.json
+          python3 value_flow_simulator_v0.2.py --sensitivity delta --output sens_delta_v0.2.json
+          python3 value_flow_simulator_v0.2.py --sensitivity pi_c --output sens_pi_c_v0.2.json
+          python3 value_flow_simulator_v0.2.py --sensitivity alpha_threshold --output sens_alpha_v0.2.json
+          python3 value_flow_simulator_v0.2.py --sensitivity pi_p --output sens_pi_p_v0.2.json
+
+      - name: Run Multi-Seed
+        run: |
+          echo "=== MULTI-SEED ==="
+          python3 value_flow_simulator_v0.2.py --multi-seed --output multi_seed_v0.2.json
+
+      - name: Run Regression Tests
+        run: |
+          echo "=== REGRESSION TESTS ==="
+          python3 value_flow_simulator_v0.2.py --regression > regression_log_v0.2.txt 2>&1
+
+      - name: Record End Time and Compute Hashes
+        run: |
+          echo "End: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> environment_manifest_v0.2.md
+          sha256sum *.json *.txt *.md > MANIFEST_SHA256_v0.2.txt
+
+      - name: Upload All Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: acaa-execution-artifacts-v0.2
+          path: |
+            *.json
+            *.txt
+            *.md
+          retention-days: 7
